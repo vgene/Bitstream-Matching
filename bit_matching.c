@@ -127,10 +127,44 @@ unsigned long get_message_head(FILE* fp1, FILE* fp2,
 	return 0;
 }
 
-void get_message(FILE* fp1, FILE* fp2,
+unsigned long get_message(FILE* fp1, FILE* fp2, char* content,
 		unsigned long message_head_pos, unsigned long delay)
 {
+	fseek(fp2, message_head_pos, SEEK_SET);
+	fseek(fp1, message_head_pos-delay, SEEK_SET);
 
+	unsigned long cnt = 0;
+	int zero_cnt = 0;
+	char ch1, ch2, ch;
+	while(1){
+#ifdef DEBUG
+		unsigned long len = ftell(fp2);
+		printf("POS FP2: %ld\n", len);
+		len = ftell(fp1);
+		printf("POS FP1: %ld\n", len);
+#endif
+		if (feof(fp1) || feof(fp2)){
+			printf("Message End!\n");
+			return cnt;
+		}
+		fread(&ch1, sizeof(char), 1, fp1);
+		fread(&ch2, sizeof(char), 1, fp2);
+
+		ch = ch1^ch2;
+#ifdef DEBUG
+		print_packet(&ch, 1);
+#endif
+		content[cnt] = ch;
+		cnt++;
+
+		if (ch == 0)
+			zero_cnt++;
+		else
+			zero_cnt=0;
+	}
+
+	content[cnt+1] = '\0';
+	return cnt;
 }
 
 int main()
@@ -150,6 +184,13 @@ int main()
     unsigned long message_head_pos = get_message_head(fp1, fp2, pos2, delay);
 
     printf("Message Pos:%ld\n", message_head_pos);
+
+    if (message_head_pos != 0){
+	    char* content = (char*) malloc(sizeof(char)*2000);
+	    unsigned long message_length = get_message(fp1, fp2, content, message_head_pos, delay);
+	    printf("Message: ");
+        print_packet(content, message_length);
+	}
 
     fclose(fp1);
     fclose(fp2);

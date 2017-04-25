@@ -23,7 +23,7 @@ void match_head(FILE* fp1, FILE* fp2){
     unsigned char* buf = (unsigned char*)malloc(sizeof(char)*MAX_SEEK+1);
 
     while (1){
-        //find first 0x47
+        //find first 0x47 in fp2
         fread(buf,sizeof(char), 1, fp1);
         cnt++;
         if (buf[0] == 0x47){
@@ -34,6 +34,8 @@ void match_head(FILE* fp1, FILE* fp2){
                 continue;
         }
     }
+
+
 
     //find three 0x47 in fp2
     char* needle = (char*) buf;
