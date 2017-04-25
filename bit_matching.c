@@ -1,10 +1,15 @@
+/*
+* Ziyang Xu (ziyang.pku@gmail.com)
+* Bit Stream Matching Module for Backscatter-DVBT
+* April. 25, 2017
+*/
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
 
 const int PACKET_LEN = 188;
-const int MAX_SEEK = 2048;
+const int MAX_SEEK = 2048; // where should i start to search, aka.forward offset
 
 int mycmp(char* str1, char* str2, unsigned long length)
 {
@@ -167,22 +172,28 @@ unsigned long get_message(FILE* fp1, FILE* fp2, char* content,
 	return cnt;
 }
 
-int main()
+int main(int argc, char const *argv[])
 {
-    FILE* fp1 = fopen("./04-11rx_2k_rate1_2.ts","rb");
-    FILE* fp2 = fopen("./04-11rx_2k_rate1_2_2.ts","rb");
+	if (argc != 3){
+		printf("Usage: %s TSfile1 TSfile2\n", argv[0]);
+		return -1;
+	}
+	// open two files
+    FILE* fp1 = fopen(argv[1],"rb");
+    FILE* fp2 = fopen(argv[2],"rb");
 
+    // get head (three 0x47 in a row) for both file1 and file2
     unsigned long pos2 = get_head(fp2, MAX_SEEK+1);
     unsigned long pos1 = get_head(fp1, pos2-MAX_SEEK);
     fseek(fp1, pos1, SEEK_SET);
     fseek(fp2, pos2, SEEK_SET);
 
+    // get delay byte count
     unsigned long delay = get_delay(fp1, fp2, pos1, pos2);
-
     printf("Delay: %ld\n", delay);
 
+    // get message head position
     unsigned long message_head_pos = get_message_head(fp1, fp2, pos2, delay);
-
     printf("Message Pos:%ld\n", message_head_pos);
 
     if (message_head_pos != 0){
@@ -194,4 +205,6 @@ int main()
 
     fclose(fp1);
     fclose(fp2);
+
+    return 0;
 }
