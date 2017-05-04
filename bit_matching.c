@@ -2,6 +2,7 @@
 * Ziyang Xu (ziyang.pku@gmail.com)
 * Bit Stream Matching Module for Backscatter-DVBT
 * April. 25, 2017
+* Modify: May. 4, 2017
 */
 #include <stdio.h>
 #include <unistd.h>
@@ -10,6 +11,7 @@
 
 const int PACKET_LEN = 188;
 const int MAX_SEEK = 2048; // where should i start to search, aka.forward offset
+const int MAX_MSG_LEN = 1048576;
 
 int mycmp(char* str1, char* str2, unsigned long length)
 {
@@ -148,7 +150,7 @@ unsigned long get_message(FILE* fp1, FILE* fp2, char* content,
 		len = ftell(fp1);
 		printf("POS FP1: %ld\n", len);
 #endif
-		if (feof(fp1) || feof(fp2)){
+		if (feof(fp1) || feof(fp2) || cnt >= MAX_MSG_LEN){
 			printf("Message End!\n");
 			return cnt;
 		}
@@ -197,7 +199,7 @@ int main(int argc, char const *argv[])
     printf("Message Pos:%ld\n", message_head_pos);
 
     if (message_head_pos != 0){
-	    char* content = (char*) malloc(sizeof(char)*2000);
+	    char* content = (char*) malloc(sizeof(char)* (MAX_MSG_LEN+1));
 	    unsigned long message_length = get_message(fp1, fp2, content, message_head_pos, delay);
 	    printf("Message: ");
         print_packet(content, message_length);
