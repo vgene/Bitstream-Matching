@@ -10,14 +10,20 @@
 #include <string.h>
 
 const int PACKET_LEN = 188;
-const int MAX_SEEK = 2048; // where should i start to search, aka.forward offset
-const int MAX_MSG_LEN = 1048576;
+const int MAX_SEEK = 0x48000; // where should i start to search, aka.forward offset
+const int MAX_MSG_LEN = 1048;
 
 int mycmp(char* str1, char* str2, unsigned long length)
 {
+	const int ROBUST_CMP_CNT = 1;
+	int miss_cnt = 0;
+
 	for (int i=0; i<length; ++i){
-		if(str1[i] != str2[i])
-			return 0;
+		if(str1[i] != str2[i]){
+			miss_cnt++;
+			if (miss_cnt>=ROBUST_CMP_CNT)
+				return 0;
+		}
 	}
 	return 1;
 }
@@ -33,7 +39,7 @@ void print_packet(char* cbuf, unsigned long length)
         second = buf[i]%16;
         printf("%x%x ", (unsigned char)first, second);
     }
-    printf("\n");
+    printf("\n\n");
 }
 
 
@@ -70,33 +76,35 @@ int get_head(FILE* fp, unsigned int start_pos)
 unsigned long get_delay(FILE* fp1, FILE* fp2,
 				unsigned long pos1, unsigned long pos2)
 {
+	const int MATCH_LEN = PACKET_LEN*3;
     //find the needle
-    char* needle = (char*)malloc(sizeof(char)*PACKET_LEN);
-    fread(needle, sizeof(char), PACKET_LEN, fp2);
+    char* needle = (char*)malloc(sizeof(char)*MATCH_LEN);
+    fread(needle, sizeof(char), MATCH_LEN, fp2);
 #ifdef DEBUG
     printf("NEEDLE:\n");
     print_packet(needle, PACKET_LEN);
 #endif
     unsigned long pin;
-    char* candidate = (char*) malloc(sizeof(char)*PACKET_LEN);
+    char* candidate = (char*) malloc(sizeof(char)*MATCH_LEN);
     //find the needle in haystack
-    for (pin = pos1; pin <= pos2; pin += PACKET_LEN){
+    for (pin = pos1; pin < pos2; pin += PACKET_LEN){
     	// printf("%ld\n", pin);
     	fseek(fp1, pin, SEEK_SET);
-    	fread(candidate, sizeof(char), PACKET_LEN, fp1);
-		// print_packet(candidate, PACKET_LEN);
-		// print_packet(needle, PACKET_LEN);
-    	int ismatch = mycmp(needle, candidate, PACKET_LEN);
+    	fread(candidate, sizeof(char), MATCH_LEN, fp1);
+		// print_packet(candidate, MATCH_LEN);
+		// print_packet(needle, MATCH_LEN);
+    	int ismatch = mycmp(needle, candidate, MATCH_LEN);
     	if (ismatch){
     		//find needle!
 #ifdef DEBUG
     		printf("CANDIDATE:\n");
-			print_packet(candidate, PACKET_LEN);
+			print_packet(candidate, MATCH_LEN);
 #endif
 			// print_packet(needle, PACKET_LEN);
     		break;
     	}
     }
+    printf("%ld,%ld\n", pos2, pin);
     //delay = pos2-pin
     unsigned long delay = pos2 - pin;
     return delay;
