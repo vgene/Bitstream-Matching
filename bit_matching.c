@@ -12,10 +12,11 @@
 const int PACKET_LEN = 188;
 const int MAX_SEEK = 0x48000; // where should i start to search, aka.forward offset
 const int MAX_MSG_LEN = 1048;
+const int ROBUST_CMP_CNT = 1;
+const int MATCH_LEN = PACKET_LEN*3;
 
 int mycmp(char* str1, char* str2, unsigned long length)
 {
-	const int ROBUST_CMP_CNT = 1;
 	int miss_cnt = 0;
 
 	for (int i=0; i<length; ++i){
@@ -76,7 +77,6 @@ int get_head(FILE* fp, unsigned int start_pos)
 unsigned long get_delay(FILE* fp1, FILE* fp2,
 				unsigned long pos1, unsigned long pos2)
 {
-	const int MATCH_LEN = PACKET_LEN*3;
     //find the needle
     char* needle = (char*)malloc(sizeof(char)*MATCH_LEN);
     fread(needle, sizeof(char), MATCH_LEN, fp2);
