@@ -4,14 +4,15 @@
 * April. 25, 2017
 * Modify: May. 4, 2017
 */
+#define MESSAGE_CONTINUE
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
 
 const int PACKET_LEN = 188;
-const int MAX_SEEK = 0x48000; // where should i start to search, aka.forward offset
-const int MAX_MSG_LEN = 1048;
+const int MAX_SEEK = 0x500000; // where should i start to search, aka.forward offset
+const int MAX_MSG_LEN = 100+1024;
 const int ROBUST_CMP_CNT = 1;
 const int MATCH_LEN = PACKET_LEN*3;
 
@@ -87,7 +88,8 @@ unsigned long get_delay(FILE* fp1, FILE* fp2,
     unsigned long pin;
     char* candidate = (char*) malloc(sizeof(char)*MATCH_LEN);
     //find the needle in haystack
-    for (pin = pos1; pin < pos2; pin += PACKET_LEN){
+    int found_needle = 0;
+    for (pin = pos1; pin <= pos2; pin += PACKET_LEN){
     	// printf("%ld\n", pin);
     	fseek(fp1, pin, SEEK_SET);
     	fread(candidate, sizeof(char), MATCH_LEN, fp1);
@@ -96,6 +98,8 @@ unsigned long get_delay(FILE* fp1, FILE* fp2,
     	int ismatch = mycmp(needle, candidate, MATCH_LEN);
     	if (ismatch){
     		//find needle!
+    		printf("FOUND NEEDLE\n");
+    		found_needle = 1;
 #ifdef DEBUG
     		printf("CANDIDATE:\n");
 			print_packet(candidate, MATCH_LEN);
@@ -104,6 +108,8 @@ unsigned long get_delay(FILE* fp1, FILE* fp2,
     		break;
     	}
     }
+    if (!found_needle)
+    	return (unsigned long)-1;
     printf("%ld,%ld\n", pos2, pin);
     //delay = pos2-pin
     unsigned long delay = pos2 - pin;
@@ -169,6 +175,7 @@ unsigned long get_message(FILE* fp1, FILE* fp2, char* content,
 #ifdef DEBUG
 		print_packet(&ch, 1);
 #endif
+
 		content[cnt] = ch;
 		cnt++;
 
@@ -181,6 +188,34 @@ unsigned long get_message(FILE* fp1, FILE* fp2, char* content,
 	content[cnt+1] = '\0';
 	return cnt;
 }
+
+void get_message_continue(FILE* fp1, FILE* fp2, unsigned long message_head_pos,
+			unsigned long delay)
+{
+	fseek(fp2, message_head_pos, SEEK_SET);
+	fseek(fp1, message_head_pos-delay, SEEK_SET);
+
+	unsigned long cnt = 0;
+	int zero_cnt = 0;
+	char ch1, ch2, ch;
+	while(1){
+		if (feof(fp1) || feof(fp2)){
+			printf("Message End!\n");
+			return;
+		}
+		fread(&ch1, sizeof(char), 1, fp1);
+		fread(&ch2, sizeof(char), 1, fp2);
+
+		ch = ch1^ch2;
+		fwrite(&ch, 1, 1, stdout);
+		cnt++;
+		// if (ch == 0)
+		// 	zero_cnt++;
+		// else
+		// 	zero_cnt=0;
+	}
+}
+
 
 int main(int argc, char const *argv[])
 {
@@ -198,8 +233,14 @@ int main(int argc, char const *argv[])
     fseek(fp1, pos1, SEEK_SET);
     fseek(fp2, pos2, SEEK_SET);
 
+    printf("pos1, pos2: %ld, %ld\n", pos1, pos2);
     // get delay byte count
     unsigned long delay = get_delay(fp1, fp2, pos1, pos2);
+    if (delay == (unsigned long) -1){
+    	printf("Doesn't Match\n");
+    	return -1;
+    }
+
     printf("Delay: %ld\n", delay);
 
     // get message head position
@@ -207,10 +248,15 @@ int main(int argc, char const *argv[])
     printf("Message Pos:%ld\n", message_head_pos);
 
     if (message_head_pos != 0){
+#ifdef MESSAGE_CONTINUE
+    	get_message_continue(fp1,fp2,message_head_pos,delay);
+#else
 	    char* content = (char*) malloc(sizeof(char)* (MAX_MSG_LEN+1));
 	    unsigned long message_length = get_message(fp1, fp2, content, message_head_pos, delay);
 	    printf("Message: ");
         print_packet(content, message_length);
+#endif
+
 	}
 
     fclose(fp1);
